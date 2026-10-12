@@ -22,7 +22,10 @@ patterns in where capital is moving, and flags any watchlist company the moment 
 3. **Ranks focus deals first**: sector **and** stage match, then either, then everything else.
 4. **Detects 2–4 patterns** across the week in one more Gemini Flash call, each backed by real deals.
 5. **Flags watchlist companies** whether they're raising, investing, or named in the headline.
-6. **Renders a scannable brief**: watchlist alerts → patterns → focus deals → other deals.
+6. **Renders a venture-intelligence dashboard**: Overview (KPIs, priority alerts, brief, charts),
+   Deals (searchable/sortable/filterable explorer with a detail drawer), Insights (full brief with
+   observed facts separated from Gemini's interpretation, plus sector/stage/trend/momentum analytics),
+   Watchlist, and Settings.
 
 **AI provider: Google Gemini Flash only** (`@google/genai`, model `gemini-3.8-flash`).
 

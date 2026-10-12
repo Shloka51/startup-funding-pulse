@@ -100,6 +100,18 @@ export interface Pattern {
   companies: string[];
 }
 
+/** Gemini Flash's weekly read. Every company/investor it names is validated against the deal list. */
+export interface WeeklyBrief {
+  /** 2–3 sentence executive summary. */
+  summary: string;
+  investorInsights: { title: string; detail: string; investors: string[]; companies: string[] }[];
+  followUps: { action: string; why: string; companies: string[] }[];
+  /** Only present when a previous week's digest existed to compare against. */
+  changes: string[];
+  /** The previous week's window used for `changes`, if any. */
+  comparedTo: { start: string; end: string } | null;
+}
+
 export interface Digest {
   window: { start: string; end: string };
   generatedAt: string;
@@ -108,6 +120,8 @@ export interface Digest {
   deals: Deal[];
   /** null when the pattern-analysis call failed. */
   patterns: Pattern[] | null;
+  /** Gemini's weekly brief. null if that call failed; undefined on digests made before this existed. */
+  brief?: WeeklyBrief | null;
   stats: {
     articles: number;
     extracted: number;

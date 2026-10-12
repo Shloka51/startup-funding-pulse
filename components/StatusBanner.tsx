@@ -2,8 +2,8 @@ export default function StatusBanner({ tone, children }: { tone: "warn" | "info"
   return (
     <div
       role={tone === "warn" ? "alert" : "status"}
-      className={`flex gap-2.5 rounded-lg px-3.5 py-2.5 text-sm ${
-        tone === "warn" ? "bg-warn-soft text-warn" : "bg-surface-2 text-muted"
+      className={`flex gap-2.5 rounded-md border px-3.5 py-2.5 text-xs ${
+        tone === "warn" ? "border-warn/30 bg-warn-soft text-warn" : "border-line bg-surface text-muted"
       }`}
     >
       <svg aria-hidden viewBox="0 0 16 16" className="mt-0.5 h-4 w-4 shrink-0 fill-current">

@@ -1,14 +1,32 @@
 import "server-only";
 import { saveDigest } from "@/lib/cache";
 import { getConfig } from "@/lib/config";
-import { analyzeWeek } from "@/lib/gemini/analyze";
+import { analyzeWeek, type PreviousWeekContext } from "@/lib/gemini/analyze";
 import { geminiModel, getGemini, mapPool } from "@/lib/gemini/client";
 import { extractDeal } from "@/lib/gemini/extract";
 import { mergeDeals } from "@/lib/merge";
+import { getWeekHistory, previousWeekOf } from "@/lib/history";
 import { fetchWeeklyNews } from "@/lib/news";
+import { investorActivity, stageBreakdown } from "@/lib/insights";
 import { matchConfig, rankDeals } from "@/lib/rank";
 import type { AppConfig, Deal, Digest, ExtractedDeal, RawItem } from "@/lib/types";
+import { sectorBreakdown } from "@/lib/summary";
 import { findWatchlistMatch } from "@/lib/watchlist";
+
+/** Compact facts about the previous reporting week, if one is stored (for "what changed"). */
+async function previousWeekContext(currentWindow: { start: string; end: string }): Promise<PreviousWeekContext | null> {
+  const history = await getWeekHistory(3);
+  const prev = previousWeekOf({ window: currentWindow } as Digest, history);
+  if (!prev) return null;
+  return {
+    window: prev.window,
+    deals: prev.deals.length,
+    capitalUsdM: prev.deals.reduce((s, d) => s + (d.amountUsdM ?? 0), 0),
+    sectors: sectorBreakdown(prev.deals, 8).map((r) => ({ sector: r.sector, deals: r.deals })),
+    stages: stageBreakdown(prev.deals).filter((r) => r.deals > 0).map((r) => ({ stage: r.stage, deals: r.deals })),
+    activeInvestors: investorActivity(prev.deals).slice(0, 5).map((i) => i.name),
+  };
+}
 
 /** Upper bound on Gemini calls per run (one per article). */
 const MAX_ARTICLES = 120;
@@ -77,8 +95,10 @@ export async function runPipeline(): Promise<Digest> {
 
   // 4. Gemini Flash: one pass over the whole week for patterns + consistent sectors/stages.
   let patterns: Digest["patterns"] = [];
+  let brief: Digest["brief"] = null;
   try {
-    const analysis = await analyzeWeek(merged, config);
+    const previous = await previousWeekContext(news.window).catch(() => null);
+    const analysis = await analyzeWeek(merged, config, previous);
     analysis.normalized.forEach((n, i) => {
       merged[i].sector = n.sector;
       merged[i].stage = n.stage;
@@ -90,10 +110,12 @@ export async function runPipeline(): Promise<Digest> {
     });
     if (renamed.some((d, i) => d.company !== merged[i].company)) merged = mergeDeals(renamed);
     patterns = analysis.patterns;
+    brief = analysis.brief;
+    if (!brief) notes.push("The AI weekly brief was unavailable for this run.");
   } catch (err) {
     console.error("[pipeline] week analysis failed:", err);
     patterns = null;
-    notes.push("Pattern analysis was unavailable for this run.");
+    notes.push("Pattern analysis and the AI brief were unavailable for this run.");
   }
 
   // 5. Rank by focus sector/stage and flag watchlist companies.
@@ -113,6 +135,7 @@ export async function runPipeline(): Promise<Digest> {
     config,
     deals,
     patterns,
+    brief,
     stats: {
       articles: articles.length,
       extracted: extracted.length,

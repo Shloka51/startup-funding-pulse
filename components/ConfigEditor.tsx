@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { AppConfig, LoadedConfig } from "@/lib/types";
 
@@ -44,6 +45,7 @@ type Status =
 const same = (a: AppConfig, b: AppConfig) => JSON.stringify(a) === JSON.stringify(b);
 
 export default function ConfigEditor({ initial }: { initial: LoadedConfig }) {
+  const router = useRouter();
   const [saved, setSaved] = useState<AppConfig>(initial.config);
   const [draft, setDraft] = useState<AppConfig>(initial.config);
   const [source, setSource] = useState(initial.source);
@@ -87,13 +89,14 @@ export default function ConfigEditor({ initial }: { initial: LoadedConfig }) {
       setDraft(data.config);
       setSource(data.source);
       setStatus({ kind: "saved", source: data.source });
+      router.refresh(); // update header alert counts straight away
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : "Save failed." });
     }
   }
 
   return (
-    <div className="mt-8 space-y-4">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${
@@ -101,7 +104,7 @@ export default function ConfigEditor({ initial }: { initial: LoadedConfig }) {
           }`}
         >
           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-current" />
-          {source === "supabase" ? "Saved in database" : "Using local config file"}
+          {source === "supabase" ? "Persisted in database" : "Using local config file (not persisted on Vercel)"}
         </span>
         {initial.warning && <span className="text-warn">{initial.warning}</span>}
       </div>
@@ -121,10 +124,10 @@ export default function ConfigEditor({ initial }: { initial: LoadedConfig }) {
         />
       ))}
 
-      <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-lg shadow-black/5">
+      <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line-strong bg-surface-2 px-4 py-3 shadow-xl">
         <p className="text-sm" role="status" aria-live="polite">
           {status.kind === "saving" && <span className="text-muted">Saving…</span>}
-          {status.kind === "saved" && <span className="text-good">Saved. The next refresh will use these settings.</span>}
+          {status.kind === "saved" && <span className="text-good">Saved. Ranking and alerts are updated.</span>}
           {status.kind === "error" && <span className="text-bad">{status.message}</span>}
           {status.kind === "idle" && (
             <span className="text-muted">{dirty ? "You have unsaved changes." : "All changes saved."}</span>
@@ -147,7 +150,7 @@ export default function ConfigEditor({ initial }: { initial: LoadedConfig }) {
             type="button"
             onClick={save}
             disabled={!dirty || status.kind === "saving"}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#0e1014]"
+            className="rounded-md bg-accent-strong px-4 py-2 text-[13px] font-medium text-on-accent transition disabled:cursor-not-allowed disabled:opacity-40"
           >
             Save settings
           </button>
@@ -183,7 +186,7 @@ function ListCard({
   }
 
   return (
-    <section className="rounded-xl border border-line bg-surface p-5">
+    <section className="rounded-lg border border-line bg-surface p-4">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="font-semibold">{title}</h2>
         <span className="text-xs tabular-nums text-faint">{items.length}</span>
@@ -197,7 +200,7 @@ function ListCard({
         {items.map((item) => (
           <li
             key={item}
-            className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-2 py-1 pl-3 pr-1 text-sm"
+            className="inline-flex items-center gap-1 rounded-md border border-line bg-surface-2 py-1 pl-2.5 pr-1 text-xs"
           >
             {item}
             <button
@@ -227,7 +230,7 @@ function ListCard({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={placeholder}
-          className="min-w-0 flex-1 rounded-lg border border-line bg-bg px-3 py-2 text-sm outline-none placeholder:text-faint focus:border-accent"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[13px] outline-none placeholder:text-faint focus:border-accent"
         />
         <button
           type="submit"

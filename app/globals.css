@@ -1,57 +1,100 @@
 @import "tailwindcss";
 
-/* Design tokens — light (default) */
+/*
+ * Design tokens. Dark (institutional) is the default; light is opt-in via the header switch,
+ * which sets <html data-theme="light">.
+ */
 :root {
-  --bg: #f6f5f1;
-  --surface: #ffffff;
-  --surface-2: #efede7;
-  --ink: #15171c;
-  --muted: #5d6270;
-  --faint: #8a8f9b;
-  --line: #e3e0d8;
-  --accent: #2f45c4;
-  --accent-soft: #e6e9fb;
-  --watch: #a6460a;
-  --watch-soft: #fdecdc;
-  --good: #1d7a4a;
-  --good-soft: #e1f3e8;
-  --warn: #8a5a00;
-  --warn-soft: #fbf0d4;
-  --bad: #b42318;
-  --bad-soft: #fde7e5;
+  --bg: #0a0c10;
+  --surface: #10131a;
+  --surface-2: #161a23;
+  --surface-3: #1c212c;
+  --ink: #e7eaf0;
+  --muted: #a1a9b8;
+  --faint: #6e7686;
+  --line: #222733;
+  --line-strong: #2e3442;
+  --accent: #6a9dff;
+  --accent-strong: #2f6ae0;
+  --on-accent: #ffffff;
+  --accent-soft: #15223d;
+  --watch: #f5a524;
+  --watch-soft: #2a1f0e;
+  --good: #3fb97a;
+  --good-soft: #0f2419;
+  --warn: #e2b341;
+  --warn-soft: #29220f;
+  --bad: #f07070;
+  --bad-soft: #2c1416;
+
+  /* Sector identity colours: validated categorical palette (fixed order, never cycled). */
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --s4: #c98500;
+  --s5: #d55181;
+  --s6: #008300;
+  --s7: #9085e9;
+  --s8: #e66767;
+  --s0: #6b6f78;
+  --tint: 24%;
+
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1014;
-    --surface: #161920;
-    --surface-2: #1d2129;
-    --ink: #eceef2;
-    --muted: #a2a8b4;
-    --faint: #737a87;
-    --line: #272b34;
-    --accent: #93a2ff;
-    --accent-soft: #1f2547;
-    --watch: #f6a85c;
-    --watch-soft: #3a2413;
-    --good: #5fcf8f;
-    --good-soft: #13301f;
-    --warn: #e9bf55;
-    --warn-soft: #332810;
-    --bad: #ff8a80;
-    --bad-soft: #3a1714;
-  }
+:root[data-theme="light"] {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --surface-3: #e7eaef;
+  --ink: #0f1420;
+  --muted: #4c5566;
+  --faint: #7a8393;
+  --line: #e0e4ea;
+  --line-strong: #cdd3dc;
+  --accent: #1f5fd6;
+  --accent-strong: #1f5fd6;
+  --on-accent: #ffffff;
+  --accent-soft: #e8effc;
+  --watch: #a14d00;
+  --watch-soft: #fdf0e1;
+  --good: #1a7f4b;
+  --good-soft: #e3f4ea;
+  --warn: #8a5a00;
+  --warn-soft: #fbf1d8;
+  --bad: #b42318;
+  --bad-soft: #fde8e6;
+
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s4: #eda100;
+  --s5: #e87ba4;
+  --s6: #008300;
+  --s7: #4a3aa7;
+  --s8: #e34948;
+  --s0: #9a9a94;
+  --tint: 16%;
+
+  color-scheme: light;
 }
+
+/* Tailwind's dark: variant = "not light". */
+@custom-variant dark (&:where(:root:not([data-theme="light"]) *));
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-on-accent: var(--on-accent);
   --color-accent-soft: var(--accent-soft);
   --color-watch: var(--watch);
   --color-watch-soft: var(--watch-soft);
@@ -65,17 +108,34 @@
   --font-mono: var(--font-geist-mono);
 }
 
-html {
-  color-scheme: light dark;
-}
-
 body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
   background: var(--accent-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Sector colour helpers: set --c on the element (see lib/sectors.ts), then use these. */
+.sector-dot {
+  background: var(--c);
+}
+.sector-tint {
+  background: color-mix(in oklab, var(--c) var(--tint), var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--c) 40%, transparent);
+}
+
+/* Thin, quiet scrollbars for horizontally scrolling tables and tabs. */
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }

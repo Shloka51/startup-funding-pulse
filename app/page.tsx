@@ -1,153 +1,103 @@
-import DealCard, { DealRow } from "@/components/DealCard";
-import {
-  PatternsSection,
-  Quiet,
-  SectionHeading,
-  SettingsLink,
-  StatTiles,
-  WatchlistAlerts,
-} from "@/components/DigestSections";
-import RefreshButton from "@/components/RefreshButton";
+import AlertsList from "@/components/AlertsList";
+import Brief, { NoDigest } from "@/components/Brief";
+import SectorChart from "@/components/charts/SectorChart";
+import StageChart from "@/components/charts/StageChart";
+import KpiRow from "@/components/KpiRow";
 import StatusBanner from "@/components/StatusBanner";
-import { getConfig } from "@/lib/config";
-import { formatRange, formatTimestamp } from "@/lib/dates";
-import { getDigestForPage } from "@/lib/digest";
-import { applyConfig } from "@/lib/rank";
-import { findWatchlistMatch } from "@/lib/watchlist";
+import { AmountText, MatchBadge, Panel, SectorTag, TextLink } from "@/components/ui";
+import { buildAlerts } from "@/lib/alerts";
+import { getDashboard } from "@/lib/dashboard";
+import { formatShortDate } from "@/lib/dates";
+import { stageBreakdown } from "@/lib/insights";
+import { sectorBreakdown } from "@/lib/summary";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-export default async function DigestPage() {
-  const [{ digest, warning }, { config }] = await Promise.all([getDigestForPage(), getConfig()]);
+export default async function OverviewPage() {
+  const { digest, warning, deals, config, previousDeals, previousWindow } = await getDashboard();
+  if (!digest) return <NoDigest warning={warning} />;
 
-  if (!digest) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        {warning && <StatusBanner tone="warn">{warning}</StatusBanner>}
-        <div className="rounded-xl border border-dashed border-line bg-surface px-6 py-12 text-center">
-          <p className="text-lg font-semibold">No digest yet</p>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
-            Generate this week&apos;s brief from live funding news. It takes about a minute while Gemini Flash reads
-            each article.
-          </p>
-          <div className="mt-5 flex justify-center">
-            <RefreshButton variant="primary" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Ranking + watchlist use the *current* settings, so edits apply instantly.
-  const deals = applyConfig(digest.deals, config, findWatchlistMatch);
-  const focus = deals.filter((d) => d.tier < 3);
-  const tier1 = deals.filter((d) => d.tier === 1);
-  const tier2 = deals.filter((d) => d.tier === 2);
-  const other = deals.filter((d) => d.tier === 3);
-  const noFocusSet = config.targetSectors.length === 0 && config.targetStages.length === 0;
+  const alerts = buildAlerts(deals);
+  const previousAlerts = previousDeals ? buildAlerts(previousDeals) : null;
+  const mandateDeals = deals.filter((d) => d.tier === 1).slice(0, 6);
+  const topDeals = mandateDeals.length ? mandateDeals : deals.filter((d) => d.tier === 2).slice(0, 6);
 
   return (
-    <div className="space-y-10">
-      <div className="space-y-5">
-        <Header range={formatRange(digest.window.start, digest.window.end)} />
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <p className="text-sm text-muted">
-            Updated {formatTimestamp(digest.generatedAt)}
-            <span className="text-faint"> · {digest.stats.articles} articles read by Gemini Flash</span>
-          </p>
-          <RefreshButton />
-        </div>
-        {warning && <StatusBanner tone="warn">{warning}</StatusBanner>}
-        {digest.notes.length > 0 && (
-          <StatusBanner tone="info">
-            {digest.notes.map((n) => (
-              <p key={n}>{n}</p>
-            ))}
-          </StatusBanner>
-        )}
-        <StatTiles deals={deals} />
-      </div>
-
-      <WatchlistAlerts deals={deals} />
-
-      {deals.length === 0 ? (
-        <Quiet action={<SettingsLink>Review your sectors in Settings →</SettingsLink>}>
-          No Indian startup funding announcements were found for this week. Sources were checked: {digest.stats.queriesOk} of{" "}
-          {digest.stats.queriesTotal} searches responded. Quiet weeks happen; try Refresh later.
-        </Quiet>
-      ) : (
-        <>
-          <PatternsSection patterns={digest.patterns} dealCount={deals.length} />
-
-          <section>
-            <SectionHeading
-              title="Focus deals"
-              count={focus.length}
-              hint={noFocusSet ? undefined : `${[...config.targetSectors, ...config.targetStages].join(" · ")}`}
-            />
-            {focus.length === 0 ? (
-              <Quiet action={<SettingsLink />}>
-                {noFocusSet
-                  ? "You haven't set any focus sectors or stages yet, so every deal is listed below."
-                  : "No deals matched your focus sectors or stages this week. Everything that did happen is listed below."}
-              </Quiet>
-            ) : (
-              <div className="space-y-6">
-                {tier1.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-medium text-faint">Sector and stage match</p>
-                    <div className="space-y-3">
-                      {tier1.map((d) => (
-                        <DealCard key={d.id} deal={d} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {tier2.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-medium text-faint">Sector or stage match</p>
-                    <ul className="divide-y divide-line rounded-xl border border-line bg-surface px-4 sm:px-5">
-                      {tier2.map((d) => (
-                        <DealRow key={d.id} deal={d} />
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-          {other.length > 0 && (
-            <section>
-              <SectionHeading title="Other deals" count={other.length} hint="Outside your focus, biggest first" />
-              <ul className="divide-y divide-line rounded-xl border border-line bg-surface px-4 sm:px-5">
-                {other.map((d) => (
-                  <DealRow key={d.id} deal={d} />
-                ))}
-              </ul>
-            </section>
-          )}
-        </>
+    <div className="space-y-5">
+      {warning && <StatusBanner tone="warn">{warning}</StatusBanner>}
+      {digest.notes.length > 0 && (
+        <StatusBanner tone="info">{digest.notes.join(" ")}</StatusBanner>
       )}
 
-      <footer className="border-t border-line pt-5 text-xs leading-relaxed text-faint">
-        Live data from Google News ({digest.stats.queriesOk}/{digest.stats.queriesTotal} searches ok) · Extraction and
-        patterns by Google Gemini Flash ({digest.model}) · Amounts in ₹ converted at ≈ ₹88/$ for comparison · Always
-        verify with the source before acting.
-      </footer>
-    </div>
-  );
-}
+      <KpiRow deals={deals} alerts={alerts} previousDeals={previousDeals} previousAlerts={previousAlerts} articles={digest.stats.articles} />
 
-function Header({ range }: { range?: string }) {
-  return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-[0.14em] text-faint">Monday brief · Indian startup funding</p>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-        {range ? `Week of ${range}` : "This week in funding"}
-      </h1>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <Panel
+          title="Priority intelligence"
+          subtitle="Watchlist and adjacency first, then mandate matches and active investors"
+          action={<TextLink href="/watchlist">Watchlist →</TextLink>}
+          padded={false}
+        >
+          <AlertsList alerts={alerts} limit={7} />
+          {alerts.length > 7 && (
+            <p className="border-t border-line px-4 py-2.5">
+              <TextLink href="/watchlist">{alerts.length - 7} more alerts →</TextLink>
+            </p>
+          )}
+        </Panel>
+
+        <Panel title="Weekly investment brief" subtitle="Generated by Gemini Flash from this week's deals; facts computed separately">
+          <Brief digest={digest} deals={deals} variant="compact" previousWindow={previousWindow} />
+        </Panel>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel title="Capital by sector" subtitle={`${deals.length} deals this week`} action={<TextLink href="/insights">Analytics →</TextLink>}>
+          <SectorChart rows={sectorBreakdown(deals, Infinity)} focusSectors={config.targetSectors} maxRows={6} />
+        </Panel>
+        <Panel title="Deals by stage" subtitle="In funding order; focus stages labelled">
+          <StageChart rows={stageBreakdown(deals)} focusStages={config.targetStages} />
+        </Panel>
+      </div>
+
+      <Panel
+        title={mandateDeals.length ? "Top mandate matches" : "Closest to your mandate"}
+        subtitle={mandateDeals.length ? "Target sector and stage, largest first" : "No full matches this week; showing sector-or-stage matches"}
+        action={<TextLink href="/deals?match=mandate">All deals →</TextLink>}
+        padded={false}
+      >
+        {topDeals.length === 0 ? (
+          <p className="px-4 py-6 text-center text-xs text-muted">
+            No deals matched your sectors or stages this week. <TextLink href="/settings">Review mandate</TextLink>
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {topDeals.map((d) => (
+              <li key={d.id}>
+                <Link
+                  href={`/deals?deal=${encodeURIComponent(d.id)}`}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-2.5 text-xs transition hover:bg-surface-2 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_6rem_minmax(0,1fr)_5rem_auto]"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-medium text-ink">{d.company}</span>
+                    <span className="block truncate text-[11px] text-faint">{d.oneLineSummary}</span>
+                  </span>
+                  <span className="hidden min-w-0 text-muted sm:block"><SectorTag sector={d.sector} /></span>
+                  <span className="hidden text-muted sm:block">{d.stage === "Undisclosed" ? "n/a" : d.stage}</span>
+                  <span className="hidden truncate text-muted sm:block">{d.leadInvestor}</span>
+                  <span className="hidden tabular-nums text-muted sm:block">{formatShortDate(d.date)}</span>
+                  <span className="flex items-center gap-3">
+                    <AmountText deal={d} />
+                    <span className="hidden lg:inline"><MatchBadge deal={d} /></span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
     </div>
   );
 }

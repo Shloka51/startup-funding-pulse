@@ -4,13 +4,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 const STEPS = [
-  { at: 0, label: "Fetching this week's funding news…" },
-  { at: 4, label: "Gemini Flash is reading each article…" },
-  { at: 40, label: "Finding patterns across the week…" },
-  { at: 70, label: "Almost there…" },
+  { at: 0, label: "Fetching this week's funding news" },
+  { at: 4, label: "Gemini Flash is reading each article" },
+  { at: 40, label: "Analysing patterns and writing the brief" },
+  { at: 70, label: "Almost there" },
 ];
 
-export default function RefreshButton({ variant = "default" }: { variant?: "default" | "primary" }) {
+/** Re-runs the full pipeline (POST /api/digest), then refreshes the page data. */
+export default function RefreshButton({ compact = false, primary = false }: { compact?: boolean; primary?: boolean }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -24,6 +25,12 @@ export default function RefreshButton({ variant = "default" }: { variant?: "defa
     return () => clearInterval(t);
   }, [running]);
 
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(() => setMessage(null), 8000);
+    return () => clearTimeout(t);
+  }, [message]);
+
   async function refresh() {
     setRunning(true);
     setElapsed(0);
@@ -35,14 +42,11 @@ export default function RefreshButton({ variant = "default" }: { variant?: "defa
       setMessage(
         data.warning
           ? { kind: "warn", text: data.warning }
-          : { kind: "ok", text: `Updated: ${data.digest?.deals?.length ?? 0} deals found.` }
+          : { kind: "ok", text: `Updated: ${data.digest?.deals?.length ?? 0} deals.` }
       );
       startTransition(() => router.refresh());
     } catch (err) {
-      setMessage({
-        kind: "warn",
-        text: err instanceof Error ? `${err.message}. The digest below is unchanged.` : "Refresh failed.",
-      });
+      setMessage({ kind: "warn", text: `${err instanceof Error ? err.message : "Refresh failed"}. Data unchanged.` });
     } finally {
       setRunning(false);
     }
@@ -51,15 +55,16 @@ export default function RefreshButton({ variant = "default" }: { variant?: "defa
   const step = [...STEPS].reverse().find((s) => elapsed >= s.at)!;
 
   return (
-    <div className="flex flex-col items-start gap-2 sm:items-end">
+    <div className="relative">
       <button
         type="button"
         onClick={refresh}
         disabled={running}
-        className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-wait ${
-          variant === "primary"
-            ? "bg-accent text-white hover:opacity-90 dark:text-[#0e1014]"
-            : "border border-line bg-surface hover:bg-surface-2"
+        title="Re-run the live pipeline (about a minute)"
+        className={`inline-flex items-center gap-1.5 rounded-md text-xs font-medium transition disabled:cursor-wait ${
+          primary
+            ? "bg-accent-strong px-3.5 py-2 text-sm text-on-accent hover:opacity-90"
+            : "h-8 border border-line px-2.5 text-muted hover:bg-surface-2 hover:text-ink"
         }`}
       >
         <svg
@@ -69,14 +74,19 @@ export default function RefreshButton({ variant = "default" }: { variant?: "defa
         >
           <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        {running ? `Refreshing… ${elapsed}s` : "Refresh digest"}
+        <span className={compact ? "hidden sm:inline" : ""}>{running ? `Refreshing ${elapsed}s` : primary ? "Generate this week's brief" : "Refresh"}</span>
       </button>
-      <p className="min-h-4 text-xs" role="status" aria-live="polite">
-        {running && <span className="text-muted">{step.label} Usually takes about a minute.</span>}
-        {!running && message && (
-          <span className={message.kind === "ok" ? "text-good" : "text-warn"}>{message.text}</span>
+      <div role="status" aria-live="polite">
+        {(running || message) && (
+          <p
+            className={`absolute right-0 top-full z-40 mt-2 w-64 rounded-md border border-line bg-surface p-2.5 text-xs shadow-xl ${
+              running ? "text-muted" : message?.kind === "ok" ? "text-good" : "text-warn"
+            } ${primary ? "left-1/2 right-auto -translate-x-1/2" : ""}`}
+          >
+            {running ? `${step.label}… usually about a minute.` : message?.text}
+          </p>
         )}
-      </p>
+      </div>
     </div>
   );
 }
