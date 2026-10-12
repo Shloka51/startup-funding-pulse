@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
+/* Design tokens — light (default) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #efede7;
+  --ink: #15171c;
+  --muted: #5d6270;
+  --faint: #8a8f9b;
+  --line: #e3e0d8;
+  --accent: #2f45c4;
+  --accent-soft: #e6e9fb;
+  --watch: #a6460a;
+  --watch-soft: #fdecdc;
+  --good: #1d7a4a;
+  --good-soft: #e1f3e8;
+  --warn: #8a5a00;
+  --warn-soft: #fbf0d4;
+  --bad: #b42318;
+  --bad-soft: #fde7e5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0e1014;
+    --surface: #161920;
+    --surface-2: #1d2129;
+    --ink: #eceef2;
+    --muted: #a2a8b4;
+    --faint: #737a87;
+    --line: #272b34;
+    --accent: #93a2ff;
+    --accent-soft: #1f2547;
+    --watch: #f6a85c;
+    --watch-soft: #3a2413;
+    --good: #5fcf8f;
+    --good-soft: #13301f;
+    --warn: #e9bf55;
+    --warn-soft: #332810;
+    --bad: #ff8a80;
+    --bad-soft: #3a1714;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-watch: var(--watch);
+  --color-watch-soft: var(--watch-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: light dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent-soft);
 }
