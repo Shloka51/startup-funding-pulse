@@ -8,7 +8,7 @@ weeks behind. Startup Funding Pulse reads the whole week's funding news for him,
 the signal with **Google Gemini Flash**, puts his focus sectors and stages first, spots
 patterns in where capital is moving, and flags any watchlist company the moment it shows up.
 
-- **Live URL:** _added on deploy_
+- **Live URL:** https://startup-funding-pulse-ivory.vercel.app
 - **Architecture:** see [`COMPONENTS_MAP.md`](COMPONENTS_MAP.md)
 
 ---
