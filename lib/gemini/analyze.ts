@@ -107,11 +107,11 @@ TASK 1 — deals: return one entry per deal id with a consistent sector and stag
 TASK 2 — patterns: 2 to 4 insights about where capital moved this week.
 - Each must be backed by at least 2 deals from the list and name those companies exactly as written above.
 - Look for: clusters by sector/sub-sector and stage, repeat or very active investors, unusually large or small rounds, geographic concentration, notable shifts.
-- title: ≤ 10 words, specific and quantified (e.g. "3 Series A rounds in fintech infrastructure").
+- title: ≤ 10 words, specific and quantified by the deals you cite (e.g. "3 Series A rounds in fintech infrastructure"); never quote week totals.
 - detail: 1–2 sentences on why it matters, addressed to the reader as "you" (never "the scout"). Only use facts from the list.
 - If there are too few deals for 2 genuine patterns, return fewer. Never invent deals or numbers.
 
-TASK 3 — summary: an executive summary in 2–3 sentences (≤ 70 words) of where capital moved this week and what matters most for the scout's mandate. Plain, factual, addressed to "you".
+TASK 3 — summary: an executive summary in 2–3 sentences (≤ 70 words) of where capital moved this week and what matters most for the scout's mandate. Plain, factual, addressed to "you". Do NOT state the total number of deals or total capital raised, and don't call anything a rise or fall versus earlier weeks; those figures are computed separately and some rows above may be duplicates that get merged.
 
 TASK 4 — investorInsights: 0 to 3 observations about investor behaviour (an investor leading or joining several rounds, a cluster of investors in one niche, a new type of backer). Each names the investors exactly as written in the deal list and the companies involved. Return [] if nothing genuine stands out.
 
