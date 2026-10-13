@@ -2,12 +2,24 @@ import { EmptyState, SectorTag } from "@/components/ui";
 import type { MomentumRow } from "@/lib/insights";
 
 /** Sector deal counts vs the previous reporting week. Only rendered with real prior data. */
-export default function MomentumTable({ rows, previousLabel }: { rows: MomentumRow[] | null; previousLabel?: string }) {
+export default function MomentumTable({
+  rows,
+  previousLabel,
+  partial = false,
+}: {
+  rows: MomentumRow[] | null;
+  previousLabel?: string;
+  partial?: boolean;
+}) {
   if (!rows) {
-    return (
+    return partial ? (
+      <EmptyState title="Week still in progress" compact>
+        Momentum compares full weeks. This week&apos;s comparison appears in Monday&apos;s brief.
+      </EmptyState>
+    ) : (
       <EmptyState title="No previous week to compare" compact>
-        Sector momentum compares this week with the last stored reporting week. It will appear automatically once a
-        second weekly digest exists.
+        Sector momentum compares this week with the previous reporting week. Build that week from the week picker in the
+        header to see it.
       </EmptyState>
     );
   }

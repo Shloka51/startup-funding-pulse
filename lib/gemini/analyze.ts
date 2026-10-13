@@ -72,7 +72,12 @@ const RESPONSE_SCHEMA: Schema = {
   required: ["deals", "patterns", "summary", "investorInsights", "followUps", "changes"],
 };
 
-function buildPrompt(deals: ExtractedDeal[], config: AppConfig, previous: PreviousWeekContext | null) {
+function buildPrompt(
+  deals: ExtractedDeal[],
+  config: AppConfig,
+  previous: PreviousWeekContext | null,
+  partialDays: number | null
+) {
   const lines = deals.map(
     (d, i) =>
       `${i} | ${d.company} | ${d.sector} / ${d.subSector || "-"} | ${d.stage} | ${d.amount} | lead: ${d.leadInvestor}` +
@@ -80,7 +85,11 @@ function buildPrompt(deals: ExtractedDeal[], config: AppConfig, previous: Previo
       (d.city ? ` | ${d.city}` : "")
   );
 
-  return `You are an analyst writing for a venture scout at an Indian family office. Below is every Indian startup funding deal announced in the past 7 days.
+  return `You are an analyst writing for a venture scout at an Indian family office. Below is every Indian startup funding deal announced in this reporting week.${
+    partialDays
+      ? ` NOTE: the week is still in progress (Monday to today, ${partialDays} day${partialDays === 1 ? "" : "s"} so far). Describe it as "so far this week" and don't treat missing days as a slowdown.`
+      : ""
+  }
 
 THE SCOUT'S FOCUS
 Sectors: ${config.targetSectors.join(", ") || "(none set)"}
@@ -108,15 +117,7 @@ TASK 4 — investorInsights: 0 to 3 observations about investor behaviour (an in
 
 TASK 5 — followUps: 2 to 4 concrete next actions for the scout (e.g. "Request an intro to <company>'s founders", "Track <investor>'s next fintech seed deal"). action ≤ 14 words; why ≤ 25 words, tied to the mandate. Name the companies involved exactly as written above.
 
-TASK 6 — changes: ${
-    previous
-      ? `compare with the PREVIOUS WEEK below and return 1–3 short, quantified statements of what changed (e.g. "Fintech rounds fell from 6 to 3"). Use only these numbers.
-PREVIOUS WEEK (${previous.window.start.slice(0, 10)} to ${previous.window.end.slice(0, 10)}): ${previous.deals} deals, ≈$${Math.round(previous.capitalUsdM)}M disclosed.
-Sectors: ${previous.sectors.map((x) => `${x.sector} ${x.deals}`).join(", ") || "n/a"}.
-Stages: ${previous.stages.map((x) => `${x.stage} ${x.deals}`).join(", ") || "n/a"}.
-Most active investors: ${previous.activeInvestors.join(", ") || "n/a"}.`
-      : "there is no previous week to compare against. Return an empty array []."
-  }`;
+TASK 6 — changes: return an empty array []. (Week-over-week numbers are computed separately from stored data.)`;
 }
 
 export interface AnalysisResult {
@@ -217,7 +218,8 @@ function validate(raw: unknown, deals: ExtractedDeal[], previous: PreviousWeekCo
 export async function analyzeWeek(
   deals: ExtractedDeal[],
   config: AppConfig,
-  previous: PreviousWeekContext | null = null
+  previous: PreviousWeekContext | null = null,
+  partialDays: number | null = null
 ): Promise<AnalysisResult> {
   if (deals.length === 0) return { normalized: new Map(), patterns: [], brief: null };
   const ai = getGemini();
@@ -232,7 +234,7 @@ export async function analyzeWeek(
     try {
       const res = await ai.models.generateContent({
         model: geminiModel(),
-        contents: buildPrompt(deals, config, previous),
+        contents: buildPrompt(deals, config, previous, partialDays),
         config: {
           responseMimeType: "application/json",
           responseSchema: RESPONSE_SCHEMA,

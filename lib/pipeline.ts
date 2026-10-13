@@ -1,11 +1,12 @@
 import "server-only";
-import { saveDigest } from "@/lib/cache";
+import { getLatestDigest, saveDigest } from "@/lib/cache";
 import { getConfig } from "@/lib/config";
 import { analyzeWeek, type PreviousWeekContext } from "@/lib/gemini/analyze";
 import { geminiModel, getGemini, mapPool } from "@/lib/gemini/client";
 import { extractDeal } from "@/lib/gemini/extract";
-import { mergeDeals } from "@/lib/merge";
+import { excludePreviouslyReported, mergeDeals } from "@/lib/merge";
 import { getWeekHistory, previousWeekOf } from "@/lib/history";
+import { completedWeekKey, windowForKey } from "@/lib/weeks";
 import { fetchWeeklyNews } from "@/lib/news";
 import { investorActivity, stageBreakdown } from "@/lib/insights";
 import { matchConfig, rankDeals } from "@/lib/rank";
@@ -29,7 +30,7 @@ async function previousWeekContext(currentWindow: { start: string; end: string }
 }
 
 /** Upper bound on Gemini calls per run (one per article). */
-const MAX_ARTICLES = 120;
+const MAX_ARTICLES = 150;
 const GEMINI_CONCURRENCY = 10;
 
 export class PipelineError extends Error {
@@ -52,13 +53,22 @@ function prioritize(items: RawItem[], config: AppConfig): RawItem[] {
  * → Gemini week analysis (1 call) → rank + watchlist flags → cache.
  * Throws PipelineError only when there's nothing meaningful to show; callers fall back to the cache.
  */
-export async function runPipeline(): Promise<Digest> {
+export interface PipelineOptions {
+  /** Defaults to the latest full Monday–Monday week (what the Monday cron builds). */
+  window?: { start: string; end: string };
+  /** "live" (latest full week), "archive" (older full week) or "wtd" (week in progress). */
+  kind?: "live" | "archive" | "wtd";
+}
+
+export async function runPipeline(opts: PipelineOptions = {}): Promise<Digest> {
+  const kind = opts.kind ?? (opts.window ? "archive" : "live");
+  const window = opts.window ?? windowForKey(completedWeekKey());
   const started = Date.now();
   const { config } = await getConfig();
   const notes: string[] = [];
 
   // 1. Live news.
-  const news = await fetchWeeklyNews(config);
+  const news = await fetchWeeklyNews(config, { window });
   const queriesOk = news.queries.filter((q) => q.ok).length;
   if (queriesOk === 0) {
     throw new PipelineError("news-failed", "Couldn't reach the live news source.");
@@ -93,12 +103,32 @@ export async function runPipeline(): Promise<Digest> {
   // 3. Same company reported by several outlets → one deal.
   let merged = mergeDeals(extracted);
 
+  // 3b. Follow-up coverage: drop rounds the previous full week's brief already reported.
+  //     Week-to-date compares with the latest full week; full weeks with the week before them.
+  const priorDigest =
+    kind === "wtd"
+      ? await getLatestDigest()
+      : previousWeekOf({ window: news.window } as Digest, await getWeekHistory(3).catch(() => []));
+  if (priorDigest) {
+    const { kept, dropped } = excludePreviouslyReported(merged, priorDigest.deals);
+    if (dropped.length) {
+      merged = kept;
+      notes.push(
+        `${dropped.length} round${dropped.length === 1 ? " was" : "s were"} already in the previous week's brief and excluded as follow-up coverage: ${dropped
+          .map((d) => d.company)
+          .join(", ")}.`
+      );
+    }
+  }
+
   // 4. Gemini Flash: one pass over the whole week for patterns + consistent sectors/stages.
   let patterns: Digest["patterns"] = [];
   let brief: Digest["brief"] = null;
   try {
-    const previous = await previousWeekContext(news.window).catch(() => null);
-    const analysis = await analyzeWeek(merged, config, previous);
+    // A part-week isn't compared with a full week: that would make every metric look like a drop.
+    const previous = kind === "wtd" ? null : await previousWeekContext(news.window).catch(() => null);
+    const partialDays = kind === "wtd" ? Math.max(1, Math.ceil((Date.parse(window.end) - Date.parse(window.start)) / 86_400_000)) : null;
+    const analysis = await analyzeWeek(merged, config, previous, partialDays);
     analysis.normalized.forEach((n, i) => {
       merged[i].sector = n.sector;
       merged[i].stage = n.stage;
@@ -130,6 +160,8 @@ export async function runPipeline(): Promise<Digest> {
 
   const digest: Digest = {
     window: news.window,
+    kind,
+    summary: { deals: deals.length, usdM: deals.reduce((s, d) => s + (d.amountUsdM ?? 0), 0) },
     generatedAt: new Date().toISOString(),
     model: geminiModel(),
     config,

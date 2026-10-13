@@ -1,9 +1,9 @@
 import { formatShortDate } from "@/lib/dates";
 import { formatAmount } from "@/lib/format";
-import { investorActivity } from "@/lib/insights";
+import { investorActivity, type NewInvestorRow } from "@/lib/insights";
 import type { Deal } from "@/lib/types";
 
-export type AlertKind = "watchlist" | "adjacent" | "mandate" | "investor";
+export type AlertKind = "watchlist" | "adjacent" | "mandate" | "new-investor" | "investor";
 
 export interface Alert {
   id: string;
@@ -31,9 +31,19 @@ function roundLine(d: Deal) {
  *  1. Watchlist companies that raised.
  *  2. Watchlist companies named in someone else's round (as investor or in coverage).
  *  3. Full mandate matches (sector AND stage), biggest first.
- *  4. Investors who backed 2+ deals this week.
+ *  4. Investors new to your target sectors (not seen in earlier stored weeks).
+ *  5. Investors who backed 2+ deals this week.
  */
-export function buildAlerts(deals: Deal[], { mandateLimit = 4, investorLimit = 3 } = {}): Alert[] {
+export function buildAlerts(
+  deals: Deal[],
+  {
+    mandateLimit = 4,
+    investorLimit = 3,
+    newInvestors = null as NewInvestorRow[] | null,
+    priorWeeks = 0,
+    newInvestorLimit = 3,
+  } = {}
+): Alert[] {
   const alerts: Alert[] = [];
 
   for (const d of deals.filter((x) => x.watchlistMatch)) {
@@ -73,6 +83,20 @@ export function buildAlerts(deals: Deal[], { mandateLimit = 4, investorLimit = 3
       why: `Matches your mandate on sector and stage. ${roundLine(d)}.`,
       href: `/deals?deal=${encodeURIComponent(d.id)}`,
       dealId: d.id,
+    });
+  }
+
+  for (const inv of (newInvestors ?? []).slice(0, newInvestorLimit)) {
+    const first = inv.companies[0];
+    alerts.push({
+      id: `n-${inv.name}`,
+      kind: "new-investor",
+      title: `New in your verticals: ${inv.name}`,
+      why: `Not seen in the previous ${priorWeeks} stored week${priorWeeks === 1 ? "" : "s"}; backed ${inv.companies
+        .map((c) => `${c.company} (${c.sector}${c.stage !== "Undisclosed" ? `, ${c.stage}` : ""})`)
+        .join(", ")}.`,
+      href: `/deals?deal=${encodeURIComponent(first.id)}`,
+      dealId: first.id,
     });
   }
 

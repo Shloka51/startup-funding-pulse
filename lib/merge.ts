@@ -55,3 +55,29 @@ export function mergeDeals(deals: MergeInput[]): MergedDeal[] {
     return { ...best, date: earliest, otherInvestors: investors.slice(0, 8), alsoReportedBy: alsoReportedBy.slice(0, 6) };
   });
 }
+
+/** Same round if amounts are within ~35% of each other, or either side didn't disclose one. */
+function similarAmount(a: number | null, b: number | null) {
+  if (a === null || b === null) return true;
+  const [lo, hi] = a < b ? [a, b] : [b, a];
+  return lo > 0 && hi / lo <= 1.35;
+}
+
+/**
+ * Drop rounds already covered in an earlier brief (follow-up articles published later).
+ * Matching: same company (tolerant of suffixes like "Semiconductor"/"Pvt Ltd") AND a similar amount.
+ */
+export function excludePreviouslyReported<T extends ExtractedDeal>(
+  deals: T[],
+  prior: Pick<ExtractedDeal, "company" | "amountUsdM">[]
+): { kept: T[]; dropped: T[] } {
+  const priorKeys = prior.map((p) => ({ key: companyKey(p.company), usd: p.amountUsdM }));
+  const kept: T[] = [];
+  const dropped: T[] = [];
+  for (const d of deals) {
+    const key = companyKey(d.company);
+    const seen = priorKeys.some((p) => sameCompany(p.key, key) && similarAmount(p.usd, d.amountUsdM));
+    (seen ? dropped : kept).push(d);
+  }
+  return { kept, dropped };
+}

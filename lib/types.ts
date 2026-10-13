@@ -114,6 +114,13 @@ export interface WeeklyBrief {
 
 export interface Digest {
   window: { start: string; end: string };
+  /**
+   * "live" = the latest full week (Monday cron / Refresh); "archive" = an older full week built on demand;
+   * "wtd" = the week in progress, Monday → when it was generated. Missing = live.
+   */
+  kind?: "live" | "archive" | "wtd";
+  /** Small totals for the week picker (avoids loading full payloads). */
+  summary?: { deals: number; usdM: number };
   generatedAt: string;
   model: string;
   config: AppConfig;

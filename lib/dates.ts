@@ -12,10 +12,13 @@ export function formatShortDate(iso: string | Date) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: IST });
 }
 
-/** e.g. "6 – 12 Oct 2026" or "28 Sep – 5 Oct 2026" */
+/**
+ * Label for a window whose end is exclusive (e.g. Mon 00:00 → next Mon 00:00 IST),
+ * showing the last day actually included: "5 – 11 Oct 2026", "28 Sep – 4 Oct 2026".
+ */
 export function formatRange(startIso: string, endIso: string) {
   const s = new Date(startIso);
-  const e = new Date(endIso);
+  const e = new Date(new Date(endIso).getTime() - 1);
   const opts = { timeZone: IST } as const;
   const sameMonth =
     s.toLocaleDateString("en-IN", { month: "short", ...opts }) ===

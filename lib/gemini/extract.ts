@@ -77,6 +77,8 @@ export function validateExtraction(raw: unknown, item: RawItem): ExtractedDeal |
 
   const company = str(o.company);
   if (!company || company.length > 80) throw new Error("Missing or invalid company");
+  // An unnamed startup ("Undisclosed", "Unknown startup") isn't an actionable deal.
+  if (/^(undisclosed|unknown|unnamed|not (specified|disclosed)|n\/?a)\b/i.test(company)) return null;
 
   const stage = (STAGES as readonly string[]).includes(o.stage as string) ? (o.stage as Stage) : "Undisclosed";
   const usd = typeof o.amountUsdM === "number" && Number.isFinite(o.amountUsdM) && o.amountUsdM > 0 ? o.amountUsdM : null;

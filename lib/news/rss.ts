@@ -6,7 +6,7 @@ const BASE = "https://news.google.com/rss/search";
 const TIMEOUT_MS = 8000;
 const MAX_SECTOR_QUERIES = 8;
 
-/** Broad queries that catch most Indian funding announcements. */
+/** Broad queries that catch most Indian funding announcements across all outlets. */
 const BASE_QUERIES = [
   "startup raises funding India",
   "Indian startup funding round",
@@ -16,17 +16,34 @@ const BASE_QUERIES = [
   "crore funding startup",
 ];
 
+/**
+ * Targeted queries for the channels where announcements appear (per the brief: startup media,
+ * press releases, financial newswires, investor/founder LinkedIn posts). All go through Google
+ * News search; LinkedIn content is only what Google News itself indexes (headlines, no scraping).
+ */
+const CHANNEL_QUERIES = [
+  "site:entrackr.com raises", // startup media
+  "site:inc42.com raises funding",
+  "site:yourstory.com raises",
+  "site:vccircle.com raises",
+  "site:prnewswire.com India raises funding", // press releases
+  "site:economictimes.indiatimes.com startup raises", // financial press / newswires
+  "site:business-standard.com startup funding",
+  "site:linkedin.com startup raises funding India", // investor & founder posts
+];
+
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
 
 function buildQueries(config: AppConfig): string[] {
   const sectorQueries = config.targetSectors
     .slice(0, MAX_SECTOR_QUERIES)
     .map((sector) => `${sector} startup funding India`);
-  return [...BASE_QUERIES, ...sectorQueries];
+  return [...BASE_QUERIES, ...CHANNEL_QUERIES, ...sectorQueries];
 }
 
-function feedUrl(query: string) {
-  const params = new URLSearchParams({ q: `${query} when:7d`, hl: "en-IN", gl: "IN", ceid: "IN:en" });
+function feedUrl(query: string, range?: { after: string; before: string }) {
+  const when = range ? `after:${range.after} before:${range.before}` : "when:7d";
+  const params = new URLSearchParams({ q: `${query} ${when}`, hl: "en-IN", gl: "IN", ceid: "IN:en" });
   return `${BASE}?${params}`;
 }
 
@@ -58,14 +75,15 @@ function parseFeed(xml: string, query: string): RawItem[] {
     const it = entry as Record<string, unknown>;
     const source = text(it.source).trim() || "Unknown";
     // Google News titles end with " - <Source>"; drop that suffix.
-    let title = text(it.title).trim();
+    // NFKC turns styled unicode (𝐑𝐚𝐢𝐬𝐞𝐬, common in LinkedIn posts) into plain letters.
+    let title = text(it.title).normalize("NFKC").trim();
     if (title.endsWith(` - ${source}`)) title = title.slice(0, -(source.length + 3)).trim();
 
     const url = text(it.link).trim();
     const date = new Date(text(it.pubDate));
     if (!title || !url || Number.isNaN(date.getTime())) continue; // malformed entry — skip
 
-    let snippet = stripHtml(text(it.description));
+    let snippet = stripHtml(text(it.description)).normalize("NFKC");
     if (snippet.endsWith(source)) snippet = snippet.slice(0, -source.length).trim();
     if (!snippet || snippet === title) snippet = "";
 
@@ -82,8 +100,8 @@ function parseFeed(xml: string, query: string): RawItem[] {
   return items;
 }
 
-async function fetchQuery(query: string) {
-  const res = await fetch(feedUrl(query), {
+async function fetchQuery(query: string, range?: { after: string; before: string }) {
+  const res = await fetch(feedUrl(query, range), {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; StartupFundingPulse/1.0)" },
     signal: AbortSignal.timeout(TIMEOUT_MS),
     cache: "no-store",
@@ -92,12 +110,12 @@ async function fetchQuery(query: string) {
   return parseFeed(await res.text(), query);
 }
 
-/** Keyless live source: Google News RSS search, scoped to India and the last 7 days. */
+/** Keyless live source: Google News RSS search, scoped to India and the last 7 days (or an archive window). */
 export const googleNewsRss: NewsSource = {
   name: "Google News",
-  async fetch(config): Promise<SourceResult[]> {
+  async fetch(config, range): Promise<SourceResult[]> {
     const queries = buildQueries(config);
-    const settled = await Promise.allSettled(queries.map(fetchQuery));
+    const settled = await Promise.allSettled(queries.map((q) => fetchQuery(q, range)));
     return settled.map((r, i) =>
       r.status === "fulfilled"
         ? { query: queries[i], ok: true, items: r.value }

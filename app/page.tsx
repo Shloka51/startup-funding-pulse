@@ -4,11 +4,12 @@ import SectorChart from "@/components/charts/SectorChart";
 import StageChart from "@/components/charts/StageChart";
 import KpiRow from "@/components/KpiRow";
 import StatusBanner from "@/components/StatusBanner";
+import WeekToDateStrip from "@/components/WeekToDateStrip";
 import { AmountText, MatchBadge, Panel, SectorTag, TextLink } from "@/components/ui";
 import { buildAlerts } from "@/lib/alerts";
 import { getDashboard } from "@/lib/dashboard";
-import { formatShortDate } from "@/lib/dates";
-import { stageBreakdown } from "@/lib/insights";
+import { formatShortDate, formatTimestamp } from "@/lib/dates";
+import { newInvestorsInFocus, stageBreakdown } from "@/lib/insights";
 import { sectorBreakdown } from "@/lib/summary";
 import Link from "next/link";
 
@@ -16,10 +17,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export default async function OverviewPage() {
-  const { digest, warning, deals, config, previousDeals, previousWindow } = await getDashboard();
+  const { digest, warning, deals, config, previousDeals, previousWindow, weekToDate, isPartial, priorDeals, priorWeeks } =
+    await getDashboard();
   if (!digest) return <NoDigest warning={warning} />;
 
-  const alerts = buildAlerts(deals);
+  const alerts = buildAlerts(deals, { newInvestors: newInvestorsInFocus(deals, priorDeals), priorWeeks });
   const previousAlerts = previousDeals ? buildAlerts(previousDeals) : null;
   const mandateDeals = deals.filter((d) => d.tier === 1).slice(0, 6);
   const topDeals = mandateDeals.length ? mandateDeals : deals.filter((d) => d.tier === 2).slice(0, 6);
@@ -31,12 +33,29 @@ export default async function OverviewPage() {
         <StatusBanner tone="info">{digest.notes.join(" ")}</StatusBanner>
       )}
 
-      <KpiRow deals={deals} alerts={alerts} previousDeals={previousDeals} previousAlerts={previousAlerts} articles={digest.stats.articles} />
+      {weekToDate && (
+        <WeekToDateStrip
+          weekKey={weekToDate.key}
+          built={weekToDate.status === "progress"}
+          deals={weekToDate.deals}
+          usdM={weekToDate.usdM}
+          updated={weekToDate.generatedAt ? formatTimestamp(weekToDate.generatedAt) : null}
+        />
+      )}
+
+      <KpiRow
+        deals={deals}
+        alerts={alerts}
+        previousDeals={previousDeals}
+        previousAlerts={previousAlerts}
+        articles={digest.stats.articles}
+        partial={isPartial}
+      />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <Panel
           title="Priority intelligence"
-          subtitle="Watchlist and adjacency first, then mandate matches and active investors"
+          subtitle="Watchlist and adjacency first, then mandate matches, new and active investors"
           action={<TextLink href="/watchlist">Watchlist →</TextLink>}
           padded={false}
         >

@@ -13,9 +13,14 @@ const MONEY =
 const NOISE =
   /\b(layoffs?|lays off|shuts? down|ipo|listing|share price|stocks?|sensex|nifty|mutual funds?|quarterly results|q[1-4] results|net profit|fii|fpi|concerns?|questions?|eyebrows|alarm|stakes|round-?ups?|this week|weekly|week \d+|in q[1-4]|yoy)\b/i;
 
+/** Explainers, guides and opinion posts that mention "funding" without announcing a round. */
+const EXPLAINER = /\b(how to|schemes?|guide|tips|lessons|explained|vs\.?|versus|why|what|should you|everyone asks)\b/i;
+
 export function isLikelyFundingNews(item: RawItem): boolean {
   const text = `${item.title} ${item.snippet}`;
-  if (NOISE.test(item.title)) return false;
+  if (NOISE.test(item.title) || EXPLAINER.test(item.title)) return false;
+  // LinkedIn posts are mostly commentary: require an explicit raise AND an amount in the headline.
+  if (/linkedin/i.test(item.source)) return RAISE_VERB.test(item.title) && MONEY.test(item.title);
   return STRONG_SIGNAL.test(text) || (RAISE_VERB.test(item.title) && MONEY.test(text));
 }
 

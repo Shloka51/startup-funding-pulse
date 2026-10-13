@@ -140,3 +140,63 @@ export function weeklySeries(history: { window: { start: string; end: string }; 
       usdM: d.deals.reduce((s, x) => s + (x.amountUsdM ?? 0), 0),
     }));
 }
+
+export interface NewInvestorRow {
+  name: string;
+  companies: { company: string; id: string; sector: string; stage: string }[];
+}
+
+/**
+ * "Has a new investor started making moves in his target verticals?"
+ * Investors in this week's target-sector deals who appear in none of the earlier stored weeks.
+ * Returns null when there's no earlier week to compare with (so nothing is falsely called "new").
+ */
+export function newInvestorsInFocus(deals: Deal[], priorDeals: ExtractedDeal[] | null): NewInvestorRow[] | null {
+  if (!priorDeals || priorDeals.length === 0) return null;
+  const seen = new Set(
+    priorDeals.flatMap((d) => [d.leadInvestor, ...d.otherInvestors]).map((n) => cleanInvestor(n).toLowerCase())
+  );
+  const map = new Map<string, NewInvestorRow>();
+  for (const d of deals.filter((x) => x.sectorMatch)) {
+    for (const raw of [d.leadInvestor, ...d.otherInvestors]) {
+      const name = cleanInvestor(raw);
+      if (!name || name === "Undisclosed" || seen.has(name.toLowerCase())) continue;
+      const row = map.get(name.toLowerCase()) ?? { name, companies: [] };
+      if (!row.companies.some((c) => c.id === d.id)) row.companies.push({ company: d.company, id: d.id, sector: d.sector, stage: d.stage });
+      map.set(name.toLowerCase(), row);
+    }
+  }
+  return [...map.values()].sort((a, b) => b.companies.length - a.companies.length || a.name.localeCompare(b.name));
+}
+
+/**
+ * "What changed vs the previous week", computed from stored deals (no AI, so the numbers are exact).
+ * Only call with a real previous full week.
+ */
+export function observedChanges(current: Deal[], previous: Deal[]): string[] {
+  const usd = (ds: Deal[]) => ds.reduce((s, d) => s + (d.amountUsdM ?? 0), 0);
+  const arrow = (a: number, b: number) => (b > a ? "▲" : b < a ? "▼" : "=");
+  const out: string[] = [];
+
+  out.push(`Deals ${previous.length} → ${current.length} (${arrow(previous.length, current.length)} ${Math.abs(current.length - previous.length)})`);
+  const [pu, cu] = [usd(previous), usd(current)];
+  if (pu > 0 || cu > 0) out.push(`Disclosed capital ≈${formatUsdM(pu)} → ≈${formatUsdM(cu)}`);
+
+  const pm = previous.filter((d) => d.tier === 1).length;
+  const cm = current.filter((d) => d.tier === 1).length;
+  out.push(`Full mandate matches ${pm} → ${cm}`);
+
+  const sectors = sectorMomentum(current, previous).filter((r) => r.delta !== 0).slice(0, 3);
+  if (sectors.length) out.push(`Biggest sector moves: ${sectors.map((r) => `${r.sector} ${r.before} → ${r.now}`).join(", ")}`);
+
+  const ps = new Map(stageBreakdown(previous).map((r) => [r.stage, r.deals]));
+  const stages = stageBreakdown(current)
+    .filter((r) => r.stage !== "Undisclosed")
+    .map((r) => ({ stage: r.stage, before: ps.get(r.stage) ?? 0, now: r.deals }))
+    .filter((r) => r.before !== r.now)
+    .sort((a, b) => Math.abs(b.now - b.before) - Math.abs(a.now - a.before))
+    .slice(0, 2);
+  if (stages.length) out.push(`Stage shifts: ${stages.map((r) => `${r.stage} ${r.before} → ${r.now}`).join(", ")}`);
+
+  return out;
+}

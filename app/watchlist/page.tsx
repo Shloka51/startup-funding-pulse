@@ -4,6 +4,7 @@ import { NoDigest } from "@/components/Brief";
 import { AmountText, EmptyState, PageTitle, Panel, TextLink } from "@/components/ui";
 import { buildAlerts } from "@/lib/alerts";
 import { getDashboard } from "@/lib/dashboard";
+import { newInvestorsInFocus } from "@/lib/insights";
 import { formatShortDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +14,18 @@ export const metadata = { title: "Watchlist · Funding Pulse" };
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 export default async function WatchlistPage() {
-  const { digest, warning, deals, config } = await getDashboard();
+  const { digest, warning, deals, config, priorDeals, priorWeeks } = await getDashboard();
   if (!digest) return <NoDigest warning={warning} />;
 
-  const alerts = buildAlerts(deals, { mandateLimit: 10, investorLimit: 6 });
+  const alerts = buildAlerts(deals, {
+    mandateLimit: 10,
+    investorLimit: 6,
+    newInvestors: newInvestorsInFocus(deals, priorDeals),
+    priorWeeks,
+    newInvestorLimit: 10,
+  });
   const priority = alerts.filter((a) => a.kind === "watchlist" || a.kind === "adjacent");
-  const signals = alerts.filter((a) => a.kind === "mandate" || a.kind === "investor");
+  const signals = alerts.filter((a) => a.kind === "mandate" || a.kind === "new-investor" || a.kind === "investor");
 
   return (
     <div className="space-y-5">
@@ -89,7 +96,7 @@ export default async function WatchlistPage() {
             emptyText="None of your tracked companies raised or appeared in another company's round this week."
           />
         </Panel>
-        <Panel title="Mandate & investor signals" subtitle="Full mandate matches and investors with 2+ deals" padded={false}>
+        <Panel title="Mandate & investor signals" subtitle="Full mandate matches, investors new to your sectors, and investors with 2+ deals" padded={false}>
           <AlertsList alerts={signals} emptyText="No full mandate matches or repeat investors this week." />
         </Panel>
       </div>

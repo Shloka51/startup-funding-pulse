@@ -2,7 +2,7 @@ import Link from "next/link";
 import RefreshButton from "@/components/RefreshButton";
 import { EmptyState, Provenance, TextLink } from "@/components/ui";
 import { formatRange } from "@/lib/dates";
-import { investorActivity, observedFacts } from "@/lib/insights";
+import { investorActivity, observedChanges, observedFacts, type NewInvestorRow } from "@/lib/insights";
 import type { Deal, Digest } from "@/lib/types";
 
 function CompanyLinks({ names, deals }: { names: string[]; deals: Deal[] }) {
@@ -45,11 +45,19 @@ export default function Brief({
   deals,
   variant = "full",
   previousWindow,
+  newInvestors = null,
+  priorWeeks = 0,
+  previousDeals = null,
 }: {
   digest: Digest;
   deals: Deal[];
   variant?: "compact" | "full";
   previousWindow: { start: string; end: string } | null;
+  /** null = no earlier week stored, so "new" can't be judged. */
+  newInvestors?: NewInvestorRow[] | null;
+  priorWeeks?: number;
+  /** The previous full week's deals, for the observed "what changed" block. */
+  previousDeals?: Deal[] | null;
 }) {
   const compact = variant === "compact";
   const brief = digest.brief;
@@ -153,22 +161,76 @@ export default function Brief({
         </div>
       )}
 
-      {/* Changes vs previous week */}
+      {/* New investors in target verticals (observed) */}
       {!compact && (
         <div>
-          <SectionLabel kind="ai">Changes vs previous week</SectionLabel>
-          {brief?.changes.length && brief.comparedTo ? (
+          <SectionLabel kind="observed">New investors in your target sectors</SectionLabel>
+          {newInvestors === null ? (
+            <p className="text-xs text-muted">
+              Needs at least one earlier stored week to tell who&apos;s new. Build last week from the week picker in the header.
+            </p>
+          ) : newInvestors.length === 0 ? (
+            <p className="text-xs text-muted">
+              Every named investor in your target-sector deals also appeared in the previous {priorWeeks} stored week
+              {priorWeeks === 1 ? "" : "s"}.
+            </p>
+          ) : (
             <>
-              <ul className="list-disc space-y-1 pl-4 text-xs text-ink">
-                {brief.changes.map((c) => <li key={c}>{c}</li>)}
+              <ul className="divide-y divide-line rounded-md border border-line">
+                {newInvestors.slice(0, 10).map((i) => (
+                  <li key={i.name} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 text-xs">
+                    <Link href={`/deals?investor=${encodeURIComponent(i.name)}`} className="font-medium text-ink hover:text-accent">
+                      {i.name}
+                    </Link>
+                    <span className="flex flex-wrap gap-1">
+                      {i.companies.map((c) => (
+                        <Link
+                          key={c.id}
+                          href={`/deals?deal=${encodeURIComponent(c.id)}`}
+                          className="rounded border border-line px-1.5 py-px text-[11px] text-muted hover:border-accent hover:text-accent"
+                        >
+                          {c.company} · {c.sector}
+                          {c.stage !== "Undisclosed" ? ` · ${c.stage}` : ""}
+                        </Link>
+                      ))}
+                    </span>
+                  </li>
+                ))}
               </ul>
-              <p className="mt-1.5 text-[11px] text-faint">Compared with {formatRange(brief.comparedTo.start, brief.comparedTo.end)}, using stored counts only.</p>
+              <p className="mt-1.5 text-[11px] text-faint">
+                Not seen in any deal across the previous {priorWeeks} stored week{priorWeeks === 1 ? "" : "s"}. Investors
+                are only known when the coverage names them.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Changes vs previous week (observed: computed, not generated) */}
+      {!compact && (
+        <div>
+          <SectionLabel kind="observed">Changes vs previous week</SectionLabel>
+          {digest.kind === "wtd" ? (
+            <p className="text-xs text-muted">
+              This week is still in progress, so it isn&apos;t compared with full weeks. The Monday brief will include the comparison.
+            </p>
+          ) : previousDeals && previousWindow ? (
+            <>
+              <ul className="space-y-1 text-xs text-ink">
+                {observedChanges(deals, previousDeals).map((c) => (
+                  <li key={c} className="flex gap-2">
+                    <span aria-hidden className="text-faint">•</span>
+                    {c}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[11px] text-faint">
+                Compared with {formatRange(previousWindow.start, previousWindow.end)}. Mandate matches use your current settings for both weeks.
+              </p>
             </>
           ) : (
             <p className="text-xs text-muted">
-              {previousWindow
-                ? "A previous week is stored; comparisons will be written on the next refresh."
-                : "No previous weekly digest is stored yet, so there is nothing to compare. This fills in automatically after next Monday's run."}
+              No previous week is stored yet. Build it from the week picker in the header to enable comparisons.
             </p>
           )}
         </div>

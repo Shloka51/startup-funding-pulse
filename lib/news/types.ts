@@ -17,5 +17,6 @@ export interface NewsSource {
   name: string;
   /** Return false to skip this source (e.g. its API key isn't set). */
   enabled?: () => boolean;
-  fetch(config: AppConfig): Promise<SourceResult[]>;
+  /** `range` limits results to an archive window (YYYY-MM-DD); omitted = the last 7 days. */
+  fetch(config: AppConfig, range?: { after: string; before: string }): Promise<SourceResult[]>;
 }

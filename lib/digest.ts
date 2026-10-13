@@ -2,6 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import { getLatestDigest } from "@/lib/cache";
 import { PipelineError, runPipeline } from "@/lib/pipeline";
+import { completedWeekKey, weekKeyOf } from "@/lib/weeks";
 import type { Digest } from "@/lib/types";
 
 export interface DigestResult {
@@ -38,21 +39,19 @@ export async function regenerateDigest(): Promise<DigestResult> {
   }
 }
 
-/** A cached digest older than this is rebuilt in the background on the next visit. */
-const STALE_AFTER_MS = 12 * 60 * 60 * 1000;
 let backgroundRun: Promise<unknown> | null = null;
 
 /**
- * For page loads: serve the cached digest instantly. If it's stale, rebuild it in the
- * background (after the response is sent) so the next visit is current. With no cache
- * at all, generate it now. Never throws.
+ * For page loads: serve the cached weekly brief instantly. If a newer full week has ended
+ * and isn't built yet (e.g. the Monday cron failed), build it in the background after the
+ * response is sent. With no cache at all, generate it now. Never throws.
  */
 export async function getDigestForPage(): Promise<DigestResult> {
   const cached = await getLatestDigest();
   if (!cached) return regenerateDigest();
 
-  const age = Date.now() - new Date(cached.generatedAt).getTime();
-  if (age > STALE_AFTER_MS && !backgroundRun) {
+  const behind = weekKeyOf(cached.window.start) < completedWeekKey();
+  if (behind && !backgroundRun) {
     after(async () => {
       backgroundRun = runPipeline().catch((err) => console.error("[digest] background refresh failed:", err));
       await backgroundRun;

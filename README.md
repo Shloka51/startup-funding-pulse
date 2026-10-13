@@ -15,8 +15,9 @@ patterns in where capital is moving, and flags any watchlist company the moment 
 
 ## What it does
 
-1. **Pulls the previous 7 days** of Indian startup-funding news live from Google News RSS
-   (6 broad searches + 1 per focus sector). No hardcoded deals.
+1. **Pulls the previous Monday–Sunday week** of Indian startup-funding news live via Google News
+   RSS: broad searches, targeted channels (startup media, PR Newswire, financial press, LinkedIn posts
+   as indexed by Google News) and one search per focus sector. No hardcoded deals.
 2. **Extracts structured deals with Gemini Flash**, one call per article: company, sector,
    stage, amount, lead investor, date, one-line summary, and source link.
 3. **Ranks focus deals first**: sector **and** stage match, then either, then everything else.
@@ -39,7 +40,8 @@ They're saved to Supabase and applied instantly. Without a database, the app rea
 
 - **Monday 07:00 IST:** Vercel Cron (`vercel.json`) regenerates and caches the brief.
 - **On demand:** the **Refresh digest** button re-runs the pipeline (about a minute).
-- **Always current:** if the cached brief is more than 12 h old, a visit triggers a background rebuild.
+- **This week so far:** any day, open the week in progress (Monday → now) from the header or Overview.
+- **Time machine:** browse the last 8 weeks; build any missing week on demand from archive news search.
 
 ## Stack
 

@@ -2,6 +2,7 @@ import "server-only";
 import { getWeekWindow } from "@/lib/dates";
 import { dedupeItems, isLikelyFundingNews } from "@/lib/news/filter";
 import { googleNewsRss } from "@/lib/news/rss";
+import { searchRange } from "@/lib/weeks";
 import type { NewsSource } from "@/lib/news/types";
 import type { AppConfig, FetchReport, QueryStatus, RawItem } from "@/lib/types";
 
@@ -9,18 +10,24 @@ import type { AppConfig, FetchReport, QueryStatus, RawItem } from "@/lib/types";
 const SOURCES: NewsSource[] = [googleNewsRss];
 
 /**
- * Fetch the previous 7 days of Indian startup funding news from every enabled
+ * Fetch the previous 7 days (or a given archive week) of Indian startup funding news from every enabled
  * source, keep only funding-related items, and de-duplicate. Never throws —
  * per-query failures are reported in `queries`.
  */
-export async function fetchWeeklyNews(config: AppConfig, now = new Date()): Promise<FetchReport> {
-  const window = getWeekWindow(now);
+export async function fetchWeeklyNews(
+  config: AppConfig,
+  opts: { now?: Date; window?: { start: string; end: string } } = {}
+): Promise<FetchReport> {
+  const window = opts.window
+    ? { start: new Date(opts.window.start), end: new Date(opts.window.end) }
+    : getWeekWindow(opts.now ?? new Date());
+  const range = opts.window ? searchRange(opts.window) : undefined;
   const active = SOURCES.filter((s) => !s.enabled || s.enabled());
 
   const perSource = await Promise.all(
     active.map(async (source) => {
       try {
-        return { source: source.name, results: await source.fetch(config) };
+        return { source: source.name, results: await source.fetch(config, range) };
       } catch (err) {
         const error = err instanceof Error ? err.message : "Source failed";
         return { source: source.name, results: [{ query: "(all)", ok: false, items: [], error }] };

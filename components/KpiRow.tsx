@@ -32,12 +32,14 @@ export default function KpiRow({
   previousDeals,
   previousAlerts,
   articles,
+  partial = false,
 }: {
   deals: Deal[];
   alerts: Alert[];
   previousDeals: Deal[] | null;
   previousAlerts: Alert[] | null;
   articles: number;
+  partial?: boolean;
 }) {
   const now = metrics(deals, alerts);
   const prev = previousDeals ? metrics(previousDeals, previousAlerts) : null;
@@ -77,7 +79,9 @@ export default function KpiRow({
       </dl>
       {!prev && (
         <p className="mt-1.5 text-[11px] text-faint">
-          Week-over-week changes appear once a previous weekly digest is stored (first comparison after next Monday&apos;s run).
+          {partial
+            ? "Week in progress: these are totals since Monday, so they aren't compared with full weeks."
+            : "Week-over-week changes appear once the previous week is stored. Build it from the week picker in the header."}
         </p>
       )}
     </div>

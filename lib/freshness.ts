@@ -1,4 +1,4 @@
-export type FreshnessLevel = "fresh" | "current" | "stale";
+export type FreshnessLevel = "fresh" | "current" | "stale" | "archive" | "progress";
 
 export interface Freshness {
   level: FreshnessLevel;
